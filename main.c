@@ -34,6 +34,7 @@ int trueLinecount(FILE *fp){
     return trueLine;
 }
 
+// Validate the format of lines inside the file using regex
 int validateFile(FILE  *fp){
     regex_t regex;
     int reti = regcomp(&regex, REGEX_EXPRESSION , REG_EXTENDED);
