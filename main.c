@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <regex.h>
+#include <curses.h>
 
 #define FILENAME "dataset.txt"
 #define REGEX_EXPRESSION "^.{2,3}\\s[0-9]*,[A-Z]+,[A-Z]+,[0-9]+,[0-9]{4},(0|[1-9][0-9]*)(\\.[0-9]+)?,[0-9]{1},\n*.*$" // Narrow down acceptable char lengths to avoid overflow
@@ -92,6 +93,11 @@ int validateTime(char time[], short *hour, short *minutes){
     }else{
         return 1;
     }
+}
+
+// combine hours and minutes to form a string
+void timecvtString(char *timeStr, short hour, short minutes){
+    sprintf(timeStr, "%02hd%02hd", hour, minutes);
 }
 
 void printTable(dataSet *head){
@@ -251,6 +257,68 @@ bool searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
     return !isEmpty;
 }
 
+void cursesPrintMain(dataSet *head, WINDOW *main, int displayableRows, int spacing, int highlitedRow, int index, int numElement)
+{
+    dataSet *curr = head;
+    // if (index>numElement-displayableRows){
+    //     index = numElement - displayableRows;
+    // }
+    // Scrolling mechanism
+    if (index >= 0){
+        for (int k = 0 ; k <index; k++){
+            curr = curr->nextNode;
+        }
+    }
+    // Print vertically
+    for (int i = 0; (i < displayableRows) && (curr != NULL); i++)
+    {
+        if (highlitedRow == i){
+            wattron(main, A_REVERSE);
+        }
+        // Print horizontally
+        for (int j = 0; (j < numElement); j++)
+        {
+            wmove(main, i, j * spacing);
+            wclrtoeol(main);
+            switch (j)
+            {
+            case 0:
+                wprintw(main, "%d", (i + index + 1));
+                break;
+            case 1:
+                wprintw(main, "%s", curr->flightNumber);
+                break;
+            case 2:
+                wprintw(main, "%s", curr->origin);
+                break;
+            case 3:
+                wprintw(main, "%s", curr->destination);
+                break;
+            case 4:
+                wprintw(main, "%d", curr->capacity);
+                break;
+            case 5:
+                char timeStr[5];
+                timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
+                wprintw(main, "%s", timeStr);
+                break;
+            case 6:
+                wprintw(main, "%.2f", curr->price);
+                break;
+            case 7:
+                wprintw(main, "%hd", curr->stops);
+                break;
+            default:
+                break;
+            }
+            wrefresh(main);
+        }
+        wattroff(main, A_REVERSE);
+        curr = curr-> nextNode;
+        
+    }
+}
+
 int main (){
 
     FILE *fp = fopen(FILENAME, "r+");
@@ -261,6 +329,113 @@ int main (){
     int lineCount = trueLinecount(fp);
     validateFile(fp);
     dataSet *db = loadFile(fp, lineCount);
+    int numElement = lineCount - 1;
+
+    initscr(); noecho(); cbreak(); start_color(); curs_set(0);
+    init_pair(1, COLOR_WHITE, COLOR_BLACK);
+    init_pair(2, COLOR_BLACK, COLOR_WHITE);
+    init_pair(3, COLOR_WHITE, COLOR_BLUE);
+
+    int maxY=0, maxX=0;
+    getmaxyx(stdscr, maxY, maxX);
+    int displayableRows = maxY - 3;
+
+    if (displayableRows <=   0){
+        fprintf(stderr, "Error: Terminal has less than 3 rows, please resisze your terminal");
+        exit(EXIT_FAILURE);
+    }
+    // Create the top attribute row
+    WINDOW *attributeRow = newwin(1, maxX, 0, 0);
+    wbkgd(attributeRow, COLOR_PAIR(3));
+
+    char *attributes[] = {
+        "No",
+        "Flight Number",
+        "Origin",
+        "Destination",
+        "Capacity",
+        "Departure Time",
+        "Price",
+        "Stops"
+    };
+
+    // Dynamicaly calculate the attribute row spacing
+    int n_attributes = sizeof(attributes)/sizeof(attributes[0]);
+    int attributesSpacing = maxX/n_attributes;
+
+    for (int i = 0; i < n_attributes; i++){
+        mvwprintw(attributeRow, 0, i * attributesSpacing, attributes[i]);
+    }
+    wrefresh(attributeRow);
+
+    // Create the window for the bottom menu bar
+    WINDOW *bottomMenu = newwin(2, maxX, (maxY-2), 0);
+    wbkgd(bottomMenu, COLOR_PAIR(2));
+    keypad(bottomMenu, TRUE);
+
+    char *choices[] = { 
+            "Search", 
+            "Sort", 
+            "insert", 
+            "Delete", 
+            "Update",
+            "Save",
+            "Quit"
+    };
+    
+    // Dynamically calculate amout of menu and spacing required
+    int n_choices = sizeof(choices)/sizeof(choices[0]);
+    int spacing = maxX/n_choices;
+    int key, menuItem = 0, highlitedRow = 0, index = 0;
+
+    WINDOW *main = newwin(displayableRows, maxX, 1, 0);
+    wbkgd(main, COLOR_PAIR(1));
+    wrefresh(main);
+
+    do{
+        cursesPrintMain(db, main, displayableRows, attributesSpacing, highlitedRow, index, numElement);
+        // Draw the screen with a specific highlight from 0-4
+        for (int i = 0; i < n_choices; i++){
+            if (i == menuItem){
+                wattron(bottomMenu, A_REVERSE);
+            }
+            mvwprintw(bottomMenu, 1, i * spacing, choices[i]);
+            wattroff(bottomMenu, A_REVERSE);
+        }
+        // printw("%d", menuItem);
+        // refresh();
+        key = wgetch(bottomMenu);
+        switch (key){
+        case KEY_LEFT:
+            menuItem--;
+            if (menuItem < 0)
+                menuItem = 0;
+            break;
+        case KEY_RIGHT:
+            menuItem++;
+            if (menuItem > n_choices - 1)
+                menuItem = n_choices - 1;
+            break;
+        case KEY_UP:
+            if (highlitedRow != 0){
+                highlitedRow--;
+            }else{
+                index--;
+            };
+            if (index<0) index = 0;
+            if (highlitedRow<0) highlitedRow = 0;
+            break;
+        case KEY_DOWN:
+            if(highlitedRow != displayableRows -1){
+                highlitedRow++;
+            }else{
+                index++;
+            }
+            if (index>numElement-displayableRows) index = numElement-displayableRows;
+            if (highlitedRow>displayableRows - 1) highlitedRow = displayableRows -1;
+            break;
+        }
+    } while (key != '\n');
 
     // sortByFlightNumber(&db);
     printTable(db);
@@ -270,4 +445,5 @@ int main (){
     printCustomOrder(search1);
     // printf("%s",search1->element->flightNumber);
     fclose(fp);
+    endwin();
 }
