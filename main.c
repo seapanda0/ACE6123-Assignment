@@ -257,22 +257,28 @@ bool searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
     return !isEmpty;
 }
 
-void cursesPrintMain(dataSet *head, WINDOW *main, int displayableRows, int spacing, int highlitedRow, int index, int numElement)
+// Print the main UI, result is a key indicating which action has been pressed
+void cursesPrintMain(dataSet *head, WINDOW *main, WINDOW *bottomMenu,
+                     int displayableRows, int spacing, int numElement, int n_choices,
+                     int *menuItem, int *index, int *highlitedRow, int *key, char **choices)
 {
+    wmove(bottomMenu, 0, 0);
+    wclrtoeol(bottomMenu);
     dataSet *curr = head;
-    // if (index>numElement-displayableRows){
-    //     index = numElement - displayableRows;
-    // }
+
     // Scrolling mechanism
-    if (index >= 0){
-        for (int k = 0 ; k <index; k++){
+    if (*index >= 0)
+    {
+        for (int k = 0; k < *index; k++)
+        {
             curr = curr->nextNode;
         }
     }
     // Print vertically
     for (int i = 0; (i < displayableRows) && (curr != NULL); i++)
     {
-        if (highlitedRow == i){
+        if (*highlitedRow == i)
+        {
             wattron(main, A_REVERSE);
         }
         // Print horizontally
@@ -283,7 +289,7 @@ void cursesPrintMain(dataSet *head, WINDOW *main, int displayableRows, int spaci
             switch (j)
             {
             case 0:
-                wprintw(main, "%d", (i + index + 1));
+                wprintw(main, "%d", (i + *index + 1));
                 break;
             case 1:
                 wprintw(main, "%s", curr->flightNumber);
@@ -314,11 +320,189 @@ void cursesPrintMain(dataSet *head, WINDOW *main, int displayableRows, int spaci
             wrefresh(main);
         }
         wattroff(main, A_REVERSE);
-        curr = curr-> nextNode;
-        
+        curr = curr->nextNode;
+    }
+    // Draw the screen with a specific highlight from 0-4
+    for (int i = 0; i < n_choices; i++)
+    {
+        if (i == *menuItem)
+        {
+            wattron(bottomMenu, A_REVERSE);
+        }
+        mvwprintw(bottomMenu, 1, i * spacing, choices[i]);
+        wattroff(bottomMenu, A_REVERSE);
+    }
+    // printw("%d", menuItem);
+    // refresh();
+    *key = wgetch(bottomMenu);
+    switch (*key)
+    {
+    case KEY_LEFT:
+        (*menuItem)--;
+        if (*menuItem < 0)
+            *menuItem = 0;
+        break;
+    case KEY_RIGHT:
+        (*menuItem)++;
+        if (*menuItem > n_choices - 1)
+            *menuItem = n_choices - 1;
+        break;
+    case KEY_UP:
+        if (*highlitedRow != 0)
+            (*highlitedRow)--;
+        else
+            (*index)--;
+        if (*index < 0)
+            *index = 0;
+        if (*highlitedRow < 0)
+            *highlitedRow = 0;
+        break;
+    case KEY_DOWN:
+        if (*highlitedRow != displayableRows - 1)
+            (*highlitedRow)++;
+        else
+            (*index)++;
+        if (*index > numElement - displayableRows)
+            *index = numElement - displayableRows;
+        if (*highlitedRow > displayableRows - 1)
+            *highlitedRow = displayableRows - 1;
+        break;
     }
 }
 
+void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+                     int displayableRows, int numElement, int n_choices, int n_attributes, int attributesSpacing,
+                     int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+{
+    int sortItem = 1;
+    mvwprintw(bottomMenu, 0, 0, "Press left & right to the attribute to be sorted.\tPress 'q' to extt sorting");
+    wrefresh(bottomMenu);
+    dataSet *curr = head;
+    bool sortAgain = false;
+
+    do
+    {
+        // Determine if need to sort or not and use sortItem to determine the attribute to be sorted
+        if (sortAgain == true)
+        {
+            if (sortItem == 1)
+            {
+                sortByFlightNumber(&head);
+                sortAgain = false;
+                curr = head;
+            }
+        }
+        // Scrolling mechanism
+        if (*index > 0)
+        {
+            for (int k = 0; k < *index; k++)
+            {
+                curr = curr->nextNode;
+            }
+        }
+        // Print vertically
+        for (int i = 0; (i < displayableRows) && (curr != NULL); i++)
+        {
+            if (*highlitedRow == i)
+            {
+                wattron(main, A_REVERSE);
+            }
+            // Print horizontally
+            for (int j = 0; (j < numElement); j++)
+            {
+                wmove(main, i, j * attributesSpacing);
+                wclrtoeol(main);
+                switch (j)
+                {
+                case 0:
+                    wprintw(main, "%d", (i + *index + 1));
+                    break;
+                case 1:
+                    wprintw(main, "%s", curr->flightNumber);
+                    break;
+                case 2:
+                    wprintw(main, "%s", curr->origin);
+                    break;
+                case 3:
+                    wprintw(main, "%s", curr->destination);
+                    break;
+                case 4:
+                    wprintw(main, "%d", curr->capacity);
+                    break;
+                case 5:
+                    char timeStr[5];
+                    timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
+                    wprintw(main, "%s", timeStr);
+                    break;
+                case 6:
+                    wprintw(main, "%.2f", curr->price);
+                    break;
+                case 7:
+                    wprintw(main, "%hd", curr->stops);
+                    break;
+                default:
+                    break;
+                }
+                wrefresh(main);
+            }
+            wattroff(main, A_REVERSE);
+            curr = curr->nextNode;
+        }
+        // Print the top attribute row
+        for (int i = 0; i < n_attributes; i++)
+        {
+            if (i == sortItem)
+            {
+                wattron(attributeRow, A_REVERSE);
+            }
+            mvwprintw(attributeRow, 0, i * attributesSpacing, attributes[i]);
+            wrefresh(attributeRow);
+            wattroff(attributeRow, A_REVERSE);
+        }
+        // printw("%d", menuItem);
+        // refresh();
+        *key = wgetch(bottomMenu);
+        switch (*key)
+        {
+        case KEY_LEFT:
+            sortItem--;
+            if (sortItem < 1)
+                sortItem = 1;
+            break;
+        case KEY_RIGHT:
+            sortItem++;
+            if (sortItem > n_attributes - 1)
+                sortItem = n_attributes - 1;
+            break;
+        case KEY_UP:
+            if (*highlitedRow != 0)
+                (*highlitedRow)--;
+            else
+                (*index)--;
+            if (*index < 0)
+                *index = 0;
+            if (*highlitedRow < 0)
+                *highlitedRow = 0;
+            break;
+        case KEY_DOWN:
+            if (*highlitedRow != displayableRows - 1)
+                (*highlitedRow)++;
+            else
+                (*index)++;
+            if (*index > numElement - displayableRows)
+                *index = numElement - displayableRows;
+            if (*highlitedRow > displayableRows - 1)
+                *highlitedRow = displayableRows - 1;
+            break;
+        case '\n':
+            sortAgain = true;
+            *index = 0;
+            *highlitedRow = 0;
+            break;
+        }
+        curr = head;
+    } while (*key != 'q');
+}
 int main (){
 
     FILE *fp = fopen(FILENAME, "r+");
@@ -392,57 +576,31 @@ int main (){
     wbkgd(main, COLOR_PAIR(1));
     wrefresh(main);
 
-    do{
-        cursesPrintMain(db, main, displayableRows, attributesSpacing, highlitedRow, index, numElement);
-        // Draw the screen with a specific highlight from 0-4
-        for (int i = 0; i < n_choices; i++){
-            if (i == menuItem){
-                wattron(bottomMenu, A_REVERSE);
-            }
-            mvwprintw(bottomMenu, 1, i * spacing, choices[i]);
-            wattroff(bottomMenu, A_REVERSE);
+    while (1)
+    {
+        do
+        {
+            // Main display UI
+            cursesPrintMain(db, main, bottomMenu, displayableRows, attributesSpacing,
+            numElement, n_choices, &menuItem, &index, &highlitedRow, &key, choices);
+ 
+        } while (key != '\n');
+
+        if (menuItem == 1)
+        {
+            menuItem = index = highlitedRow = key = 0;
+            cursesPrintSort(db, main, bottomMenu, attributeRow, 
+            displayableRows, numElement, n_choices, n_attributes, attributesSpacing,
+            &menuItem, &index, &highlitedRow, &key, choices, attributes);
         }
-        // printw("%d", menuItem);
-        // refresh();
-        key = wgetch(bottomMenu);
-        switch (key){
-        case KEY_LEFT:
-            menuItem--;
-            if (menuItem < 0)
-                menuItem = 0;
-            break;
-        case KEY_RIGHT:
-            menuItem++;
-            if (menuItem > n_choices - 1)
-                menuItem = n_choices - 1;
-            break;
-        case KEY_UP:
-            if (highlitedRow != 0){
-                highlitedRow--;
-            }else{
-                index--;
-            };
-            if (index<0) index = 0;
-            if (highlitedRow<0) highlitedRow = 0;
-            break;
-        case KEY_DOWN:
-            if(highlitedRow != displayableRows -1){
-                highlitedRow++;
-            }else{
-                index++;
-            }
-            if (index>numElement-displayableRows) index = numElement-displayableRows;
-            if (highlitedRow>displayableRows - 1) highlitedRow = displayableRows -1;
-            break;
-        }
-    } while (key != '\n');
+    }
 
     // sortByFlightNumber(&db);
-    printTable(db);
+    // printTable(db);
 
-    customOrder *search1;
-    searchFlightNumber(db, "Asdhsu", &search1);
-    printCustomOrder(search1);
+    // customOrder *search1;
+    // searchFlightNumber(db, "Asdhsu", &search1);
+    // printCustomOrder(search1);
     // printf("%s",search1->element->flightNumber);
     fclose(fp);
     endwin();
