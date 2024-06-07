@@ -373,6 +373,7 @@ void cursesPrintMain(dataSet *head, WINDOW *main, WINDOW *bottomMenu,
 void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
                      int displayableRows, int numElement, int n_choices, int n_attributes, int attributesSpacing,
                      int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+
 {
     int sortItem = 1;
     mvwprintw(bottomMenu, 0, 0, "Press left & right to the attribute to be sorted.\tPress 'q' to extt sorting");
@@ -503,6 +504,157 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
         curr = head;
     } while (*key != 'q');
 }
+
+void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+                     int displayableRows, int numElement, int n_choices, int n_attributes, int attributesSpacing,
+                     int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+
+{
+    int searchItem = 1;
+    mvwprintw(bottomMenu, 0, 0, "Press left & right to select attribute to be searched.\tPress 'q' to exit searching");
+    wrefresh(bottomMenu);
+    dataSet *curr = head;
+    bool promptSearch = false;
+
+    do
+    {
+        // Determine if need to sort or not and use sortItem to determine the attribute to be sorted
+        if (promptSearch == true)
+        {
+            if (searchItem == 1)
+            {
+                char input[10];
+                customOrder *search;
+
+                wmove(bottomMenu, 0, 0);
+                wclrtoeol(bottomMenu);
+
+                mvwprintw(bottomMenu, 0, 0, "Search by %s:", attributes[searchItem]);
+                nocbreak(); echo(); curs_set(1);
+                mvwgetnstr(bottomMenu,0, 30, input, 9);
+                cbreak(); noecho(); curs_set(0);
+
+                searchFlightNumber(head, input, &search);
+
+                promptSearch = false;
+                curr = head;
+            }
+        }
+        // Scrolling mechanism
+        if (*index > 0)
+        {
+            for (int k = 0; k < *index; k++)
+            {
+                curr = curr->nextNode;
+            }
+        }
+        // Print vertically
+        for (int i = 0; (i < displayableRows) && (curr != NULL); i++)
+        {
+            if (*highlitedRow == i)
+            {
+                wattron(main, A_REVERSE);
+            }
+            // Print horizontally
+            for (int j = 0; (j < numElement); j++)
+            {
+                wmove(main, i, j * attributesSpacing);
+                wclrtoeol(main);
+                switch (j)
+                {
+                case 0:
+                    wprintw(main, "%d", (i + *index + 1));
+                    break;
+                case 1:
+                    wprintw(main, "%s", curr->flightNumber);
+                    break;
+                case 2:
+                    wprintw(main, "%s", curr->origin);
+                    break;
+                case 3:
+                    wprintw(main, "%s", curr->destination);
+                    break;
+                case 4:
+                    wprintw(main, "%d", curr->capacity);
+                    break;
+                case 5:
+                    char timeStr[5];
+                    timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
+                    wprintw(main, "%s", timeStr);
+                    break;
+                case 6:
+                    wprintw(main, "%.2f", curr->price);
+                    break;
+                case 7:
+                    wprintw(main, "%hd", curr->stops);
+                    break;
+                default:
+                    break;
+                }
+                wrefresh(main);
+            }
+            wattroff(main, A_REVERSE);
+            curr = curr->nextNode;
+        }
+        // Print the top attribute row
+        for (int i = 0; i < n_attributes; i++)
+        {
+            if (i == searchItem)
+            {
+                wattron(attributeRow, A_REVERSE);
+            }
+            mvwprintw(attributeRow, 0, i * attributesSpacing, attributes[i]);
+            wrefresh(attributeRow);
+            wattroff(attributeRow, A_REVERSE);
+        }
+        // printw("%d", menuItem);
+        // refresh();
+        *key = wgetch(bottomMenu);
+        switch (*key)
+        {
+        case KEY_LEFT:
+            searchItem--;
+            if (searchItem < 1)
+                searchItem = 1;
+            break;
+        case KEY_RIGHT:
+            searchItem++;
+            if (searchItem > n_attributes - 1)
+                searchItem = n_attributes - 1;
+            break;
+        case KEY_UP:
+            if (*highlitedRow != 0)
+                (*highlitedRow)--;
+            else
+                (*index)--;
+            if (*index < 0)
+                *index = 0;
+            if (*highlitedRow < 0)
+                *highlitedRow = 0;
+            break;
+        case KEY_DOWN:
+            if (*highlitedRow != displayableRows - 1)
+                (*highlitedRow)++;
+            else
+                (*index)++;
+            if (*index > numElement - displayableRows)
+                *index = numElement - displayableRows;
+            if (*highlitedRow > displayableRows - 1)
+                *highlitedRow = displayableRows - 1;
+            break;
+        case '\n':
+            promptSearch = true;
+            *index = 0;
+            *highlitedRow = 0;
+            break;
+        }
+        curr = head;
+    } while (*key != 'q');
+}
+
+
+
+
 int main (){
 
     FILE *fp = fopen(FILENAME, "r+");
@@ -586,8 +738,14 @@ int main (){
  
         } while (key != '\n');
 
-        if (menuItem == 1)
+        if (menuItem == 0)
         {
+            menuItem = index = highlitedRow = key = 0;
+            cursesPrintSearch(db, main, bottomMenu, attributeRow, 
+            displayableRows, numElement, n_choices, n_attributes, attributesSpacing,
+            &menuItem, &index, &highlitedRow, &key, choices, attributes);
+
+        }else if (menuItem == 1){
             menuItem = index = highlitedRow = key = 0;
             cursesPrintSort(db, main, bottomMenu, attributeRow, 
             displayableRows, numElement, n_choices, n_attributes, attributesSpacing,
