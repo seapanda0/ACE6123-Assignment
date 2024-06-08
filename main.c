@@ -6,7 +6,7 @@
 #include <regex.h>
 #include <curses.h>
 
-#define FILENAME "dataset.txt"
+#define FILENAME "dataset"
 #define REGEX_EXPRESSION "^.{2,3}\\s[0-9]*,[A-Z]+,[A-Z]+,[0-9]+,[0-9]{4},(0|[1-9][0-9]*)(\\.[0-9]+)?,[0-9]{1},\n*.*$" // Narrow down acceptable char lengths to avoid overflow
 
 #define EXIT_SEARCH "Press 'q' to exit searching"
@@ -1247,24 +1247,19 @@ int main ()
 {
     char filename[100];
     printf("Please enter a file to open:\t");
-    fgets(filename, 99, stdin);
+    scanf("%s", filename);
 
-    FILE *fp = fopen(FILENAME, "r+");
+    FILE *fp = fopen(filename, "r+");
     if (!fp){
         perror("Error Opening File");
+        exit(EXIT_FAILURE);
     }
-
-
 
     int lineCount = trueLinecount(fp);
     validateFile(fp);
 
     dataSet *db = loadFile(fp, lineCount);
     int numElement = lineCount - 1;
-
-    // sortByFlightNumber(&db);
-
-    // writetoCopy(db, fp2);
 
     // Initialize ncurses
     initscr(); noecho(); cbreak(); start_color(); curs_set(0);
