@@ -358,7 +358,7 @@ void inputValidateTime(WINDOW *bottomMenu, char *validatedStr, char *regexExpres
 // Print the main UI, result is a key indicating which action has been pressed
 void cursesPrintMain(dataSet *head, WINDOW *main, WINDOW *bottomMenu,
                      int displayableRows, int spacing, int numElement, int n_choices,
-                     int *menuItem, int *index, int *highlitedRow, int *key, char **choices)
+                     int *menuItem, int *index, int *highlitedRow, int *key, char **choices, int n_attributes)
 {
     wmove(bottomMenu, 0, 0);
     wclrtoeol(bottomMenu);
@@ -380,7 +380,7 @@ void cursesPrintMain(dataSet *head, WINDOW *main, WINDOW *bottomMenu,
             wattron(main, A_REVERSE);
         }
         // Print horizontally
-        for (int j = 0; (j < numElement); j++)
+        for (int j = 0; (j < n_attributes); j++)
         {
             wmove(main, i, j * spacing);
             wclrtoeol(main);
@@ -460,8 +460,13 @@ void cursesPrintMain(dataSet *head, WINDOW *main, WINDOW *bottomMenu,
             (*highlitedRow)++;
         else
             (*index)++;
-        if (*index > numElement - displayableRows)
+        if ((*index > numElement - displayableRows))
             *index = numElement - displayableRows;
+        if ((numElement - displayableRows )<= 0){
+            *index = 0;
+            if (*highlitedRow > numElement - 1)
+                *highlitedRow = numElement - 1;
+        }
         if (*highlitedRow > displayableRows - 1)
             *highlitedRow = displayableRows - 1;
         break;
@@ -1077,6 +1082,87 @@ void cursesDelete(dataSet **head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attr
     (*numElement)--;
 }
 
+void cursesUpdate(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+                     int displayableRows, int n_choices, int n_attributes, int attributesSpacing, int maxX,
+                     int *numElement, int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+{
+    dataSet *newEntry = (dataSet*)calloc(1,sizeof(dataSet));
+    dataSet *curr = head;
+    char temp[10];
+    // Cyele to the current index
+    for (int k = 0; k < (*index + *highlitedRow); k++)
+    {
+        curr = curr->nextNode;
+    }
+    //taking input for 7 attributes
+    for (int i = 1; i<= n_attributes -1; i++){
+        wmove(bottomMenu, 0, 0);
+        wclrtoeol(bottomMenu);
+        wmove(bottomMenu, 1, 0);
+        wclrtoeol(bottomMenu);
+        mvwprintw(bottomMenu, 0, 0, "Add %s:", attributes[i]);
+        bool validated = false;
+        nocbreak();
+        echo();
+        curs_set(1);
+        switch (i)
+        {
+        case 1:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %s", curr->flightNumber);
+            inputandValidateStr(bottomMenu, newEntry->flightNumber, ".{2,3}\\s[0-9]*", 20, maxX, false);
+            break;
+        case 2:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %s", curr->origin);
+            inputandValidateStr(bottomMenu, newEntry->origin, "[A-Z]+", 20, maxX, false);
+            break;
+        case 3:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %s", curr->destination);
+            inputandValidateStr(bottomMenu, newEntry->destination, "[A-Z]+", 20, maxX, false);
+            break;
+        case 4:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %hd", curr->capacity);
+            inputandValidateStr(bottomMenu, temp,"[0-9]+", 20, maxX, false);
+            newEntry->capacity = atoi(temp);
+            break;
+        case 5:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %hd%hd", curr->departureHour, curr->departureMinutes);
+            inputValidateTime(bottomMenu, temp,"[0-9]{4}", 20, maxX, &(newEntry->departureHour), &(newEntry->departureMinutes));
+            break;
+        case 6:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %.2f", curr->price);
+            inputandValidateStr(bottomMenu, temp,"(0|[1-9][0-9]*)(\\.[0-9]+)?", 20, maxX, false);
+            newEntry->price = atof(temp);
+            break;
+        case 7:
+            mvwprintw(bottomMenu, 1, 0, "Current Value: %hd", curr->stops);
+            inputandValidateStr(bottomMenu, temp, "[0-9]{1}", 20, maxX, false);
+            newEntry->stops = atoi(temp);
+            break;
+        default:
+            break;
+        }
+        cbreak();
+        noecho();
+        curs_set(0);
+    }
+    cbreak();
+    noecho();
+    curs_set(0);
+
+    strcpy(curr->flightNumber, newEntry->flightNumber);
+    strcpy(curr->origin, newEntry->origin);
+    strcpy(curr->destination, newEntry->destination);
+    curr->capacity = newEntry->capacity;
+    curr->departureHour = newEntry->departureHour;
+    curr->departureMinutes = newEntry->departureMinutes;
+    curr->price = newEntry->price;
+    curr->stops = newEntry->stops;
+
+    mvwprintw(bottomMenu, 0, 0, "New entry has been updated in line %d! Press any key to continue", *index + *highlitedRow +2);
+    wgetch(bottomMenu);
+    (*numElement)++;
+}
+
 int main ()
 {
 
@@ -1165,8 +1251,9 @@ int main ()
         do
         {
             // Main display UI
-            cursesPrintMain(db, main, bottomMenu, displayableRows, attributesSpacing,
-            numElement, n_choices, &menuItem, &index, &highlitedRow, &key, choices);
+            cursesPrintMain(db, main, bottomMenu, 
+            displayableRows, attributesSpacing, numElement, n_choices, 
+            &menuItem, &index, &highlitedRow, &key, choices, n_attributes);
  
         } while (key != '\n');
 
@@ -1192,9 +1279,12 @@ int main ()
             cursesInsert(db, main, bottomMenu, attributeRow, 
             displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
             &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
-        }
-        else if (menuItem == 4){
+        }else if (menuItem == 4){
             cursesDelete(&db, main, bottomMenu, attributeRow, 
+            displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
+            &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
+        }else if (menuItem == 5){
+            cursesUpdate(db, main, bottomMenu, attributeRow, 
             displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
             &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
         }
