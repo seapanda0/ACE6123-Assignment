@@ -278,7 +278,7 @@ void writetoCopy(dataSet *head, FILE *fp){
 
     while(curr!= NULL){
         timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
-        fprintf(fp, "%s,%s,%s,%hd,%s,%hd,%.2f,%hd,\n", curr->flightNumber, curr->origin, curr->destination, 
+        fprintf(fp, "%s,%s,%s,%hd,%s,%.2f,%hd,\n", curr->flightNumber, curr->origin, curr->destination, 
         curr->capacity, timeStr, curr->price, curr->stops);
         curr = curr->nextNode;
     }
@@ -512,7 +512,7 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
                 wattron(main, A_REVERSE);
             }
             // Print horizontally
-            for (int j = 0; (j < numElement); j++)
+            for (int j = 0; (j < n_attributes); j++)
             {
                 wmove(main, i, j * attributesSpacing);
                 wclrtoeol(main);
@@ -1161,6 +1161,8 @@ void cursesUpdate(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attri
     mvwprintw(bottomMenu, 0, 0, "New entry has been updated in line %d! Press any key to continue", *index + *highlitedRow +2);
     wgetch(bottomMenu);
     (*numElement)++;
+    wmove(bottomMenu, 1, 0);
+    wclrtoeol(bottomMenu);
 }
 
 int main ()
@@ -1183,7 +1185,7 @@ int main ()
 
     // writetoCopy(db, fp2);
 
-
+    // Initialize ncurses
     initscr(); noecho(); cbreak(); start_color(); curs_set(0);
     init_pair(1, COLOR_WHITE, COLOR_BLACK);
     init_pair(2, COLOR_BLACK, COLOR_WHITE);
@@ -1257,6 +1259,7 @@ int main ()
  
         } while (key != '\n');
 
+        // menuItem correspond to each of the functionalites present in the bottom menu
         if (menuItem == 0)
         {
             menuItem = index = highlitedRow = key = 0;
@@ -1287,6 +1290,18 @@ int main ()
             cursesUpdate(db, main, bottomMenu, attributeRow, 
             displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
             &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
+        }else if (menuItem == 6){
+            mvwprintw(bottomMenu, 0, 0, "Do you want to save? (Y/N)", FILENAME2);
+            char choice = wgetch(bottomMenu);
+            if (choice == 'Y' || choice == 'y'){
+                writetoCopy(db, fp2);
+                wmove(bottomMenu, 0, 0);
+                wclrtoeol(bottomMenu);
+                mvwprintw(bottomMenu, 0, 0, "File has been saved! Press any key to continue");
+                wgetch(bottomMenu);
+            }
+        }else if (menuItem == 7){
+            break;
         }
     }
 
