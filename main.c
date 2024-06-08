@@ -15,7 +15,6 @@
 #define WRONG_FORMAT "Wrong Format! Please try again"
 #define WRONG_FORMAT_N 30
 
-#define FILENAME2 "dataset-copy.txt"
 #define DATASET_HEADER "Flight number,origin,destination,capacity,departure time,price,stops,\n"
 
 typedef struct dataSet{
@@ -211,14 +210,42 @@ void swap(dataSet **head, dataSet *nodeA, dataSet *nodeB){
     return;
 }
 
-// Bubble sort
-void sortByFlightNumber(dataSet **head)
+// Bubble sort, option 1-7 controls what to be sorted
+void sortDB(dataSet **head, int option)
 {
     dataSet *curr = *head;
     bool swapped = false;
+    char str1[5], str2[5];
+    int result;
     while (true){
         if (curr->nextNode != NULL){
-            int result = strcmp(curr->flightNumber, curr->nextNode->flightNumber);
+            switch (option)
+            {
+            case 1:
+                result = strcmp(curr->flightNumber, curr->nextNode->flightNumber);
+                break;
+            case 2:
+                result = strcmp(curr->origin, curr->nextNode->origin);
+                break;
+            case 3:
+                result = strcmp(curr->destination, curr->nextNode->destination);
+                break;
+            case 4:
+                result = curr->capacity - curr->nextNode->capacity;
+                break;
+            case 5:
+                timecvtString(str1, curr->departureHour, curr->departureMinutes);
+                timecvtString(str2, curr->nextNode->departureHour, curr->nextNode->departureMinutes);
+                result = strcmp(str1, str2);
+            case 6:
+                result = curr->price - curr->nextNode->price;
+                break;
+            case 7:
+                result = curr->stops - curr->nextNode->stops;
+                break;
+            default:
+                break;
+            }
             if (result > 0){
                 swap(head, curr, curr->nextNode);
                 swapped = true;
@@ -237,26 +264,70 @@ void sortByFlightNumber(dataSet **head)
     }
 }
 
-// Linear search using strstr function, number of entries searched
-int searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
+// Linear search using strstr function, return number of matches found
+// Use optiion to control what to search 1: Flight Number, 2: Origin, 3: Destination
+int searchDB(dataSet *head, char input[], customOrder **headSearch, int option){
     customOrder *currSearch = (customOrder*)calloc(1,sizeof(customOrder));
     *headSearch = currSearch;
     dataSet *curr = head;
     char *result;
     bool isEmpty = true;
-    int numMatches =  0;
-    while(curr != NULL){
-        result = strstr(curr->flightNumber, input);
-        // if the input is a substring
-        if (result != NULL){
-            currSearch->element = curr;
-            currSearch->nextElement = (customOrder*)calloc(1,sizeof(customOrder));
-            currSearch->nextElement->previousElement = currSearch;
-            currSearch = currSearch->nextElement;
-            isEmpty =  false;
-            numMatches++;
+    int numMatches = 0;
+    switch (option)
+    {
+    case 1:
+        while (curr != NULL)
+        {
+            result = strstr(curr->flightNumber, input);
+            // if the input is a substring
+            if (result != NULL)
+            {
+                currSearch->element = curr;
+                currSearch->nextElement = (customOrder *)calloc(1, sizeof(customOrder));
+                currSearch->nextElement->previousElement = currSearch;
+                currSearch = currSearch->nextElement;
+                isEmpty = false;
+                numMatches++;
+            }
+            curr = curr->nextNode;
         }
-        curr = curr->nextNode;
+        break;
+    case 2:
+        while (curr != NULL)
+        {
+            result = strstr(curr->origin, input);
+            // if the input is a substring
+            if (result != NULL)
+            {
+                currSearch->element = curr;
+                currSearch->nextElement = (customOrder *)calloc(1, sizeof(customOrder));
+                currSearch->nextElement->previousElement = currSearch;
+                currSearch = currSearch->nextElement;
+                isEmpty = false;
+                numMatches++;
+            }
+            curr = curr->nextNode;
+        }
+        break;
+    case 3:
+        while (curr != NULL)
+        {
+            result = strstr(curr->destination, input);
+            // if the input is a substring
+            if (result != NULL)
+            {
+                currSearch->element = curr;
+                currSearch->nextElement = (customOrder *)calloc(1, sizeof(customOrder));
+                currSearch->nextElement->previousElement = currSearch;
+                currSearch = currSearch->nextElement;
+                isEmpty = false;
+                numMatches++;
+            }
+            curr = curr->nextNode;
+        }
+        break;
+    default:
+        break;
     }
     if (!isEmpty){
         currSearch->previousElement->nextElement = NULL;
@@ -269,7 +340,7 @@ int searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
     return numMatches;
 }
 
-void writetoCopy(dataSet *head, FILE *fp){
+void writeFile(dataSet *head, FILE *fp){
     rewind(fp);
     dataSet *curr = head;
     char timeStr[5];
@@ -473,7 +544,7 @@ void cursesPrintMain(dataSet *head, WINDOW *main, WINDOW *bottomMenu,
     }
 }
 
-void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+void cursesPrintSort(dataSet **head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
                      int displayableRows, int numElement, int n_choices, int n_attributes, int attributesSpacing,
                      int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
 
@@ -481,7 +552,7 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
     int sortItem = 1;
     mvwprintw(bottomMenu, 0, 0, "Press left & right to the attribute to be sorted.\tPress 'q' to extt sorting");
     wrefresh(bottomMenu);
-    dataSet *curr = head;
+    dataSet *curr = *head;
     bool sortAgain = false;
 
     do
@@ -489,12 +560,9 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
         // Determine if need to sort or not and use sortItem to determine the attribute to be sorted
         if (sortAgain == true)
         {
-            if (sortItem == 1)
-            {
-                sortByFlightNumber(&head);
-                sortAgain = false;
-                curr = head;
-            }
+            sortDB(head, sortItem);
+            sortAgain = false;
+            curr = *head;
         }
         // Scrolling mechanism
         if (*index > 0)
@@ -595,6 +663,12 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
                 (*index)++;
             if (*index > numElement - displayableRows)
                 *index = numElement - displayableRows;
+            if ((numElement - displayableRows) <= 0)
+            {
+                *index = 0;
+                if (*highlitedRow > numElement - 1)
+                    *highlitedRow = numElement - 1;
+            }
             if (*highlitedRow > displayableRows - 1)
                 *highlitedRow = displayableRows - 1;
             break;
@@ -604,8 +678,8 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
             *highlitedRow = 0;
             break;
         }
-        curr = head;
-    } while (*key != 'q');
+        curr = *head;
+    } while (*key != 'q' && *key != 'Q');
 }
 
 void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
@@ -628,47 +702,50 @@ void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *
         // If search is pressed
         if (promptSearch == true)
         {
-            if (searchItem == 1)
+            wmove(bottomMenu, 0, 0);
+            wclrtoeol(bottomMenu);
+
+            mvwprintw(bottomMenu, 0, 0, "Search by %s:", attributes[searchItem]);
+            nocbreak();
+            echo();
+            curs_set(1);
+            mvwgetnstr(bottomMenu, 0, 30, input, 9);
+            cbreak();
+            noecho();
+            curs_set(0);
+            // TODO: Use switch case to implement searching on various attributes
+            numMatches = 0;
+            if (input[0] != '\0' && input[0] != ' ')
             {
+                numMatches = searchDB(head, input, &search, searchItem);
+            }
+            if (numMatches != 0)
+            {
+                displaySearch = true;
+                ;
                 wmove(bottomMenu, 0, 0);
                 wclrtoeol(bottomMenu);
-
-                mvwprintw(bottomMenu, 0, 0, "Search by %s:", attributes[searchItem]);
-                nocbreak();
-                echo();
-                curs_set(1);
-                mvwgetnstr(bottomMenu, 0, 30, input, 9);
-                cbreak();
-                noecho();
-                curs_set(0);
-                // TODO: Use switch case to implement searching on various attributes
-                numMatches = 0;
-                if (input[0] != '\0' && input[0] != ' '){
-                    numMatches = searchFlightNumber(head, input, &search);
-                }
-                if (numMatches != 0)
-                {
-                    displaySearch = true;;
-                    wmove(bottomMenu, 0, 0);
-                    wclrtoeol(bottomMenu);
-                    mvwprintw(bottomMenu, 0, 0, "%d matches has been found! Select any attribute to search again", numMatches);
-                    wclear(main); wrefresh(main);
-                    mvwprintw(bottomMenu, 0, maxX-EXIT_SEARCH_N, EXIT_SEARCH);
-                    wrefresh(bottomMenu);
-                }else{
-                    displaySearch = false;
-                    wmove(bottomMenu, 0, 0);
-                    wclrtoeol(bottomMenu);
-                    mvwprintw(bottomMenu, 0, 0, "No match has been found! Press any key to continue");
-                    wclear(main); wrefresh(main);
-                    wgetch(bottomMenu);
-                    mvwprintw(bottomMenu, 0, 0, "Press left & right to select attribute to be searched.");
-                    mvwprintw(bottomMenu, 0, maxX-EXIT_SEARCH_N, EXIT_SEARCH);
-                }
-
-                promptSearch = false;
-                currSearch = search;
+                mvwprintw(bottomMenu, 0, 0, "%d matches has been found! Select any attribute to search again", numMatches);
+                wclear(main);
+                wrefresh(main);
+                mvwprintw(bottomMenu, 0, maxX - EXIT_SEARCH_N, EXIT_SEARCH);
+                wrefresh(bottomMenu);
             }
+            else
+            {
+                displaySearch = false;
+                wmove(bottomMenu, 0, 0);
+                wclrtoeol(bottomMenu);
+                mvwprintw(bottomMenu, 0, 0, "No match has been found! Press any key to continue");
+                wclear(main);
+                wrefresh(main);
+                wgetch(bottomMenu);
+                mvwprintw(bottomMenu, 0, 0, "Press left & right to select attribute to be searched.");
+                mvwprintw(bottomMenu, 0, maxX - EXIT_SEARCH_N, EXIT_SEARCH);
+            }
+
+            promptSearch = false;
+            currSearch = search;
         }
         // Display search result or display normal database
         if (displaySearch)
@@ -752,8 +829,8 @@ void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *
                 break;
             case KEY_RIGHT:
                 searchItem++;
-                if (searchItem > n_attributes - 1)
-                    searchItem = n_attributes - 1;
+                if (searchItem > n_attributes - 5)
+                    searchItem = n_attributes - 5;
                 break;
             case KEY_UP:
                 if (*highlitedRow != 0)
@@ -866,8 +943,8 @@ void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *
                 break;
             case KEY_RIGHT:
                 searchItem++;
-                if (searchItem > n_attributes - 1)
-                    searchItem = n_attributes - 1;
+                if (searchItem > n_attributes - 5)
+                    searchItem = n_attributes - 5;
                 break;
             case KEY_UP:
                 if (*highlitedRow != 0)
@@ -897,7 +974,7 @@ void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *
             }
             curr = head;
         }
-    } while (*key != 'q');
+    } while (*key != 'q' && *key != 'Q');
 }
 
 void cursesAdd(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
@@ -919,27 +996,27 @@ void cursesAdd(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attribut
         switch (i)
         {
         case 1:
-            inputandValidateStr(bottomMenu, newEntry->flightNumber, ".{2,3}\\s[0-9]*", 20, maxX, false);
+            inputandValidateStr(bottomMenu, newEntry->flightNumber, "^.{2,3}\\s[0-9]*$", 20, maxX, false);
             break;
         case 2:
-            inputandValidateStr(bottomMenu, newEntry->origin, "[A-Z]+", 20, maxX, false);
+            inputandValidateStr(bottomMenu, newEntry->origin, "^[A-Z]+$", 20, maxX, false);
             break;
         case 3:
-            inputandValidateStr(bottomMenu, newEntry->destination, "[A-Z]+", 20, maxX, false);
+            inputandValidateStr(bottomMenu, newEntry->destination, "^[A-Z]+$", 20, maxX, false);
             break;
         case 4:
-            inputandValidateStr(bottomMenu, temp,"[0-9]+", 20, maxX, false);
+            inputandValidateStr(bottomMenu, temp,"^[0-9]+$", 20, maxX, false);
             newEntry->capacity = atoi(temp);
             break;
         case 5:
-            inputValidateTime(bottomMenu, temp,"[0-9]{4}", 20, maxX, &(newEntry->departureHour), &(newEntry->departureMinutes));
+            inputValidateTime(bottomMenu, temp,"^[0-9]{4}$", 20, maxX, &(newEntry->departureHour), &(newEntry->departureMinutes));
             break;
         case 6:
-            inputandValidateStr(bottomMenu, temp,"(0|[1-9][0-9]*)(\\.[0-9]+)?", 20, maxX, false);
+            inputandValidateStr(bottomMenu, temp,"^(0|[1-9][0-9]*)(\\.[0-9]+)?$", 20, maxX, false);
             newEntry->price = atof(temp);
             break;
         case 7:
-            inputandValidateStr(bottomMenu, temp, "[0-9]{1}", 20, maxX, false);
+            inputandValidateStr(bottomMenu, temp, "^[0-9]{1}$", 20, maxX, false);
             newEntry->stops = atoi(temp);
             break;
         default:
@@ -985,16 +1062,16 @@ void cursesInsert(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attri
         switch (i)
         {
         case 1:
-            inputandValidateStr(bottomMenu, newEntry->flightNumber, ".{2,3}\\s[0-9]*", 20, maxX, false);
+            inputandValidateStr(bottomMenu, newEntry->flightNumber, "^.{2,3}\\s[0-9]*$", 20, maxX, false);
             break;
         case 2:
-            inputandValidateStr(bottomMenu, newEntry->origin, "[A-Z]+", 20, maxX, false);
+            inputandValidateStr(bottomMenu, newEntry->origin, "^[A-Z]+$", 20, maxX, false);
             break;
         case 3:
-            inputandValidateStr(bottomMenu, newEntry->destination, "[A-Z]+", 20, maxX, false);
+            inputandValidateStr(bottomMenu, newEntry->destination, "^[A-Z]+$", 20, maxX, false);
             break;
         case 4:
-            inputandValidateStr(bottomMenu, temp,"[0-9]+", 20, maxX, false);
+            inputandValidateStr(bottomMenu, temp,"^[0-9]{4}$", 20, maxX, false);
             newEntry->capacity = atoi(temp);
             break;
         case 5:
@@ -1005,7 +1082,7 @@ void cursesInsert(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attri
             newEntry->price = atof(temp);
             break;
         case 7:
-            inputandValidateStr(bottomMenu, temp, "[0-9]{1}", 20, maxX, false);
+            inputandValidateStr(bottomMenu, temp, "^[0-9]{1}$", 20, maxX, false);
             newEntry->stops = atoi(temp);
             break;
         default:
@@ -1090,7 +1167,8 @@ void cursesUpdate(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attri
     dataSet *curr = head;
     char temp[10];
     // Cyele to the current index
-    for (int k = 0; k < (*index + *highlitedRow); k++)
+    for (int 
+    k = 0; k < (*index + *highlitedRow); k++)
     {
         curr = curr->nextNode;
     }
@@ -1167,13 +1245,16 @@ void cursesUpdate(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attri
 
 int main ()
 {
+    char filename[100];
+    printf("Please enter a file to open:\t");
+    fgets(filename, 99, stdin);
 
     FILE *fp = fopen(FILENAME, "r+");
     if (!fp){
         perror("Error Opening File");
     }
 
-    FILE *fp2 = fopen(FILENAME2, "w");
+
 
     int lineCount = trueLinecount(fp);
     validateFile(fp);
@@ -1269,7 +1350,7 @@ int main ()
 
         }else if (menuItem == 1){
             menuItem = index = highlitedRow = key = 0;
-            cursesPrintSort(db, main, bottomMenu, attributeRow, 
+            cursesPrintSort(&db, main, bottomMenu, attributeRow, 
             displayableRows, numElement, n_choices, n_attributes, attributesSpacing,
             &menuItem, &index, &highlitedRow, &key, choices, attributes);
         }
@@ -1291,10 +1372,11 @@ int main ()
             displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
             &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
         }else if (menuItem == 6){
-            mvwprintw(bottomMenu, 0, 0, "Do you want to save? (Y/N)", FILENAME2);
+            mvwprintw(bottomMenu, 0, 0, "Do you want to save? (Y/N)?");
             char choice = wgetch(bottomMenu);
             if (choice == 'Y' || choice == 'y'){
-                writetoCopy(db, fp2);
+                rewind(fp);
+                writeFile(db, fp);
                 wmove(bottomMenu, 0, 0);
                 wclrtoeol(bottomMenu);
                 mvwprintw(bottomMenu, 0, 0, "File has been saved! Press any key to continue");
@@ -1304,15 +1386,7 @@ int main ()
             break;
         }
     }
-
-    // sortByFlightNumber(&db);
-    // printTable(db);
-
-    // customOrder *search1;
-    // searchFlightNumber(db, "Asdhsu", &search1);
-    // printCustomOrder(search1);
-    // printf("%s",search1->element->flightNumber);
+    echo();
     fclose(fp);
-    fclose(fp2);
     endwin();
 }
