@@ -9,6 +9,15 @@
 #define FILENAME "dataset.txt"
 #define REGEX_EXPRESSION "^.{2,3}\\s[0-9]*,[A-Z]+,[A-Z]+,[0-9]+,[0-9]{4},(0|[1-9][0-9]*)(\\.[0-9]+)?,[0-9]{1},\n*.*$" // Narrow down acceptable char lengths to avoid overflow
 
+#define EXIT_SEARCH "Press 'q' to exit searching"
+#define EXIT_SEARCH_N 27
+
+#define WRONG_FORMAT "Wrong Format! Please try again"
+#define WRONG_FORMAT_N 30
+
+#define FILENAME2 "dataset-copy.txt"
+#define DATASET_HEADER "Flight number,origin,destination,capacity,departure time,price,stops,\n"
+
 typedef struct dataSet{
     char flightNumber[20];
     char origin[5];
@@ -80,8 +89,8 @@ int validateFile(FILE  *fp){
     regfree(&regex);
 }
 
-// Return 0 if time is correct, split time in String to two hour and minutes in short
-int validateTime(char time[], short *hour, short *minutes){
+// Return true if time is correct, split time in String to two hour and minutes in short
+bool validateTime(char time[], short *hour, short *minutes){
     char temp[3];
     strncpy(temp, time, 2), temp[2]='\0';
     *hour = atoi(temp);
@@ -89,9 +98,9 @@ int validateTime(char time[], short *hour, short *minutes){
     *minutes = atoi(temp);
 
     if (*minutes>= 0 && *minutes <= 59 && *hour>=0 && *hour<=23){
-        return 0;
+        return true;
     }else{
-        return 1;
+        return false;
     }
 }
 
@@ -132,7 +141,8 @@ void printCustomOrder(customOrder *order){
 dataSet *loadFile(FILE *fp, int lineCount){
     char line[256], time[5];
     dataSet temp;
-    int err, i = 0;
+    bool err; 
+    int i = 0;
 
     dataSet *curr = (dataSet *)calloc(1, sizeof(dataSet));
     dataSet *head = curr;
@@ -148,7 +158,7 @@ dataSet *loadFile(FILE *fp, int lineCount){
 
         err = validateTime(time, &(curr->departureHour), &(curr->departureMinutes));
 
-        if (err){
+        if (!err){
             fclose(fp);
             fprintf(stderr, "Error: Date Format Error at line %d of %s\n",i+1, FILENAME);
             exit(EXIT_FAILURE);
@@ -227,13 +237,14 @@ void sortByFlightNumber(dataSet **head)
     }
 }
 
-// Linear search using strstr function, return true if there is at least one match
-bool searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
+// Linear search using strstr function, number of entries searched
+int searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
     customOrder *currSearch = (customOrder*)calloc(1,sizeof(customOrder));
     *headSearch = currSearch;
     dataSet *curr = head;
     char *result;
     bool isEmpty = true;
+    int numMatches =  0;
     while(curr != NULL){
         result = strstr(curr->flightNumber, input);
         // if the input is a substring
@@ -243,6 +254,7 @@ bool searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
             currSearch->nextElement->previousElement = currSearch;
             currSearch = currSearch->nextElement;
             isEmpty =  false;
+            numMatches++;
         }
         curr = curr->nextNode;
     }
@@ -254,7 +266,93 @@ bool searchFlightNumber(dataSet *head, char input[], customOrder **headSearch){
         free(*headSearch);
         *headSearch = NULL;
     }
-    return !isEmpty;
+    return numMatches;
+}
+
+void writetoCopy(dataSet *head, FILE *fp){
+    rewind(fp);
+    dataSet *curr = head;
+    char timeStr[5];
+
+    fprintf(fp, DATASET_HEADER);
+
+    while(curr!= NULL){
+        timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
+        fprintf(fp, "%s,%s,%s,%hd,%s,%hd,%.2f,%hd,\n", curr->flightNumber, curr->origin, curr->destination, 
+        curr->capacity, timeStr, curr->price, curr->stops);
+        curr = curr->nextNode;
+    }
+    return;
+}
+
+// Input a string and validate it using 
+void inputandValidateStr(WINDOW *bottomMenu, char *validatedStr, char *regexExpressrion, int spacing, int maxX, bool initialErr)
+{
+    regex_t regex;
+    bool validated = false;
+    bool firstErr = initialErr;
+    while (!validated)
+    {
+        int reti = regcomp(&regex, regexExpressrion, REG_EXTENDED);
+        wmove(bottomMenu, 0, spacing);
+        wclrtoeol(bottomMenu);
+        if(firstErr){
+            mvwprintw(bottomMenu, 0, maxX-WRONG_FORMAT_N, WRONG_FORMAT);
+            wrefresh(bottomMenu);
+        }
+        mvwgetnstr(bottomMenu, 0, spacing, validatedStr, 9);
+        reti = regexec(&regex, validatedStr, 0, NULL, 0);
+        if (reti == 0)
+        {
+            validated = true;
+        }else{
+            firstErr = true;
+        }
+    }
+}
+
+// Redundant function, placed for future use
+void inputandValidateShort(WINDOW *bottomMenu, short *validatedShort, char *regexExpressrion, int spacing, int maxX)
+{
+    regex_t regex;
+    char validatedStr[10];
+    int reti = regcomp(&regex, regexExpressrion, REG_EXTENDED);
+    bool validated = false;
+    bool firsrErr = false;
+    while (!validated)
+    {
+        int reti = regcomp(&regex, regexExpressrion, REG_EXTENDED);
+        wmove(bottomMenu, 0, spacing);
+        wclrtoeol(bottomMenu);
+        if(firsrErr){
+            mvwprintw(bottomMenu, 0, maxX-WRONG_FORMAT_N, WRONG_FORMAT);
+            wrefresh(bottomMenu);
+        }
+        mvwgetnstr(bottomMenu, 0, spacing, validatedStr, 9);
+        reti = regexec(&regex, validatedStr, 0, NULL, 0);
+        if (reti == 0)
+        {
+            *validatedShort = atoi(validatedStr);
+            validated = true;
+        }else{
+            firsrErr = true;
+        }
+    }
+
+}
+
+// valdate time, the function first call inputandValidateStr and proceed to use validateTime to check time format
+//  pass the hour and minutes as reference to be modified
+void inputValidateTime(WINDOW *bottomMenu, char *validatedStr, char *regexExpressrion,
+                       int spacing, int maxX,
+                       short *hour, short *minutes)
+{
+    bool repeat = false;
+    do
+    {
+        inputandValidateStr(bottomMenu, validatedStr, regexExpressrion, spacing, maxX, repeat);
+        repeat = true;
+    } while ((validateTime(validatedStr, hour, minutes)) == false);
 }
 
 // Print the main UI, result is a key indicating which action has been pressed
@@ -506,166 +604,499 @@ void cursesPrintSort(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *at
 }
 
 void cursesPrintSearch(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
-                     int displayableRows, int numElement, int n_choices, int n_attributes, int attributesSpacing,
+                     int displayableRows, int numElement, int n_choices, int n_attributes, int attributesSpacing, int maxX,
                      int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
 
 {
-    int searchItem = 1;
-    mvwprintw(bottomMenu, 0, 0, "Press left & right to select attribute to be searched.\tPress 'q' to exit searching");
+    int searchItem = 1, numMatches = 0;
+    mvwprintw(bottomMenu, 0, 0, "Press left & right to select attribute to be searched.");
+    mvwprintw(bottomMenu, 0, maxX-EXIT_SEARCH_N, EXIT_SEARCH);
+
     wrefresh(bottomMenu);
     dataSet *curr = head;
-    bool promptSearch = false;
+    customOrder *search, *currSearch;
+    bool promptSearch = false, displaySearch = false;
+    char input[10];
 
     do
     {
-        // Determine if need to sort or not and use sortItem to determine the attribute to be sorted
+        // If search is pressed
         if (promptSearch == true)
         {
             if (searchItem == 1)
             {
-                char input[10];
-                customOrder *search;
-
                 wmove(bottomMenu, 0, 0);
                 wclrtoeol(bottomMenu);
 
                 mvwprintw(bottomMenu, 0, 0, "Search by %s:", attributes[searchItem]);
-                nocbreak(); echo(); curs_set(1);
-                mvwgetnstr(bottomMenu,0, 30, input, 9);
-                cbreak(); noecho(); curs_set(0);
-
-                searchFlightNumber(head, input, &search);
+                nocbreak();
+                echo();
+                curs_set(1);
+                mvwgetnstr(bottomMenu, 0, 30, input, 9);
+                cbreak();
+                noecho();
+                curs_set(0);
+                // TODO: Use switch case to implement searching on various attributes
+                numMatches = 0;
+                if (input[0] != '\0' && input[0] != ' '){
+                    numMatches = searchFlightNumber(head, input, &search);
+                }
+                if (numMatches != 0)
+                {
+                    displaySearch = true;;
+                    wmove(bottomMenu, 0, 0);
+                    wclrtoeol(bottomMenu);
+                    mvwprintw(bottomMenu, 0, 0, "%d matches has been found! Select any attribute to search again", numMatches);
+                    wclear(main); wrefresh(main);
+                    mvwprintw(bottomMenu, 0, maxX-EXIT_SEARCH_N, EXIT_SEARCH);
+                    wrefresh(bottomMenu);
+                }else{
+                    displaySearch = false;
+                    wmove(bottomMenu, 0, 0);
+                    wclrtoeol(bottomMenu);
+                    mvwprintw(bottomMenu, 0, 0, "No match has been found! Press any key to continue");
+                    wclear(main); wrefresh(main);
+                    wgetch(bottomMenu);
+                    mvwprintw(bottomMenu, 0, 0, "Press left & right to select attribute to be searched.");
+                    mvwprintw(bottomMenu, 0, maxX-EXIT_SEARCH_N, EXIT_SEARCH);
+                }
 
                 promptSearch = false;
-                curr = head;
+                currSearch = search;
             }
         }
-        // Scrolling mechanism
-        if (*index > 0)
+        // Display search result or display normal database
+        if (displaySearch)
         {
-            for (int k = 0; k < *index; k++)
+            mvwprintw(bottomMenu, 0, maxX-EXIT_SEARCH_N, EXIT_SEARCH);
+            if (*index > 0)
             {
+                for (int k = 0; k < *index; k++)
+                {
+                    currSearch = currSearch->nextElement;
+                }
+            }
+            // Print vertically
+            for (int i = 0; (i < displayableRows) && (currSearch != NULL); i++)
+            {
+                if (*highlitedRow == i)
+                {
+                    wattron(main, A_REVERSE);
+                }
+                // Print horizontally
+                for (int j = 0; (j < numElement); j++)
+                {
+                    wmove(main, i, j * attributesSpacing);
+                    wclrtoeol(main);
+                    switch (j)
+                    {
+                    case 0:
+                        wprintw(main, "%d", (i + *index + 1));
+                        break;
+                    case 1:
+                        wprintw(main, "%s", currSearch->element->flightNumber);
+                        break;
+                    case 2:
+                        wprintw(main, "%s", currSearch->element->origin);
+                        break;
+                    case 3:
+                        wprintw(main, "%s", currSearch->element->destination);
+                        break;
+                    case 4:
+                        wprintw(main, "%d", currSearch->element->capacity);
+                        break;
+                    case 5:
+                        char timeStr[5];
+                        timecvtString(timeStr, currSearch->element->departureHour, currSearch->element->departureMinutes);
+                        wprintw(main, "%s", timeStr);
+                        break;
+                    case 6:
+                        wprintw(main, "%.2f", currSearch->element->price);
+                        break;
+                    case 7:
+                        wprintw(main, "%hd", currSearch->element->stops);
+                        break;
+                    default:
+                        break;
+                    }
+                    wrefresh(main);
+                }
+                wattroff(main, A_REVERSE);
+                currSearch = currSearch->nextElement;
+            }
+            // Print the top attribute row
+            for (int i = 0; i < n_attributes; i++)
+            {
+                if (i == searchItem)
+                {
+                    wattron(attributeRow, A_REVERSE);
+                }
+                mvwprintw(attributeRow, 0, i * attributesSpacing, attributes[i]);
+                wrefresh(attributeRow);
+                wattroff(attributeRow, A_REVERSE);
+            }
+            // printw("%d", menuItem);
+            // refresh();
+            *key = wgetch(bottomMenu);
+            switch (*key)
+            {
+            case KEY_LEFT:
+                searchItem--;
+                if (searchItem < 1)
+                    searchItem = 1;
+                break;
+            case KEY_RIGHT:
+                searchItem++;
+                if (searchItem > n_attributes - 1)
+                    searchItem = n_attributes - 1;
+                break;
+            case KEY_UP:
+                if (*highlitedRow != 0)
+                    (*highlitedRow)--;
+                else
+                    (*index)--;
+                if (*index < 0)
+                    *index = 0;
+                if (*highlitedRow < 0)
+                    *highlitedRow = 0;
+                break;
+            case KEY_DOWN:
+                if (*highlitedRow != displayableRows - 1)
+                    (*highlitedRow)++;
+                else
+                    (*index)++;
+                if (*index > numMatches - displayableRows)
+                    *index = numMatches - displayableRows;
+                if (*index < 0)
+                    *index = 0;
+                if (*highlitedRow > displayableRows - 1)
+                    *highlitedRow = displayableRows - 1;
+                if (*highlitedRow > numMatches - 1)
+                    *highlitedRow = numMatches - 1;
+                break;
+            case '\n':
+                promptSearch = true;
+                *index = 0;
+                *highlitedRow = 0;
+                break;
+            }
+            currSearch = search;
+        }else{
+            // Display normal database
+            if (*index > 0)
+            {
+                for (int k = 0; k < *index; k++)
+                {
+                    curr = curr->nextNode;
+                }
+            }
+            // Print vertically
+            for (int i = 0; (i < displayableRows) && (curr != NULL); i++)
+            {
+                if (*highlitedRow == i)
+                {
+                    wattron(main, A_REVERSE);
+                }
+                // Print horizontally
+                for (int j = 0; (j < numElement); j++)
+                {
+                    wmove(main, i, j * attributesSpacing);
+                    wclrtoeol(main);
+                    switch (j)
+                    {
+                    case 0:
+                        wprintw(main, "%d", (i + *index + 1));
+                        break;
+                    case 1:
+                        wprintw(main, "%s", curr->flightNumber);
+                        break;
+                    case 2:
+                        wprintw(main, "%s", curr->origin);
+                        break;
+                    case 3:
+                        wprintw(main, "%s", curr->destination);
+                        break;
+                    case 4:
+                        wprintw(main, "%d", curr->capacity);
+                        break;
+                    case 5:
+                        char timeStr[5];
+                        timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
+                        wprintw(main, "%s", timeStr);
+                        break;
+                    case 6:
+                        wprintw(main, "%.2f", curr->price);
+                        break;
+                    case 7:
+                        wprintw(main, "%hd", curr->stops);
+                        break;
+                    default:
+                        break;
+                    }
+                    wrefresh(main);
+                }
+                wattroff(main, A_REVERSE);
                 curr = curr->nextNode;
             }
-        }
-        // Print vertically
-        for (int i = 0; (i < displayableRows) && (curr != NULL); i++)
-        {
-            if (*highlitedRow == i)
+            // Print the top attribute row
+            for (int i = 0; i < n_attributes; i++)
             {
-                wattron(main, A_REVERSE);
-            }
-            // Print horizontally
-            for (int j = 0; (j < numElement); j++)
-            {
-                wmove(main, i, j * attributesSpacing);
-                wclrtoeol(main);
-                switch (j)
+                if (i == searchItem)
                 {
-                case 0:
-                    wprintw(main, "%d", (i + *index + 1));
-                    break;
-                case 1:
-                    wprintw(main, "%s", curr->flightNumber);
-                    break;
-                case 2:
-                    wprintw(main, "%s", curr->origin);
-                    break;
-                case 3:
-                    wprintw(main, "%s", curr->destination);
-                    break;
-                case 4:
-                    wprintw(main, "%d", curr->capacity);
-                    break;
-                case 5:
-                    char timeStr[5];
-                    timecvtString(timeStr, curr->departureHour, curr->departureMinutes);
-                    wprintw(main, "%s", timeStr);
-                    break;
-                case 6:
-                    wprintw(main, "%.2f", curr->price);
-                    break;
-                case 7:
-                    wprintw(main, "%hd", curr->stops);
-                    break;
-                default:
-                    break;
+                    wattron(attributeRow, A_REVERSE);
                 }
-                wrefresh(main);
+                mvwprintw(attributeRow, 0, i * attributesSpacing, attributes[i]);
+                wrefresh(attributeRow);
+                wattroff(attributeRow, A_REVERSE);
             }
-            wattroff(main, A_REVERSE);
-            curr = curr->nextNode;
-        }
-        // Print the top attribute row
-        for (int i = 0; i < n_attributes; i++)
-        {
-            if (i == searchItem)
+            // printw("%d", menuItem);
+            // refresh();
+            *key = wgetch(bottomMenu);
+            switch (*key)
             {
-                wattron(attributeRow, A_REVERSE);
-            }
-            mvwprintw(attributeRow, 0, i * attributesSpacing, attributes[i]);
-            wrefresh(attributeRow);
-            wattroff(attributeRow, A_REVERSE);
-        }
-        // printw("%d", menuItem);
-        // refresh();
-        *key = wgetch(bottomMenu);
-        switch (*key)
-        {
-        case KEY_LEFT:
-            searchItem--;
-            if (searchItem < 1)
-                searchItem = 1;
-            break;
-        case KEY_RIGHT:
-            searchItem++;
-            if (searchItem > n_attributes - 1)
-                searchItem = n_attributes - 1;
-            break;
-        case KEY_UP:
-            if (*highlitedRow != 0)
-                (*highlitedRow)--;
-            else
-                (*index)--;
-            if (*index < 0)
+            case KEY_LEFT:
+                searchItem--;
+                if (searchItem < 1)
+                    searchItem = 1;
+                break;
+            case KEY_RIGHT:
+                searchItem++;
+                if (searchItem > n_attributes - 1)
+                    searchItem = n_attributes - 1;
+                break;
+            case KEY_UP:
+                if (*highlitedRow != 0)
+                    (*highlitedRow)--;
+                else
+                    (*index)--;
+                if (*index < 0)
+                    *index = 0;
+                if (*highlitedRow < 0)
+                    *highlitedRow = 0;
+                break;
+            case KEY_DOWN:
+                if (*highlitedRow != displayableRows - 1)
+                    (*highlitedRow)++;
+                else
+                    (*index)++;
+                if (*index > numElement - displayableRows)
+                    *index = numElement - displayableRows;
+                if (*highlitedRow > displayableRows - 1)
+                    *highlitedRow = displayableRows - 1;
+                break;
+            case '\n':
+                promptSearch = true;
                 *index = 0;
-            if (*highlitedRow < 0)
                 *highlitedRow = 0;
-            break;
-        case KEY_DOWN:
-            if (*highlitedRow != displayableRows - 1)
-                (*highlitedRow)++;
-            else
-                (*index)++;
-            if (*index > numElement - displayableRows)
-                *index = numElement - displayableRows;
-            if (*highlitedRow > displayableRows - 1)
-                *highlitedRow = displayableRows - 1;
-            break;
-        case '\n':
-            promptSearch = true;
-            *index = 0;
-            *highlitedRow = 0;
-            break;
+                break;
+            }
+            curr = head;
         }
-        curr = head;
     } while (*key != 'q');
 }
 
+void cursesAdd(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+                     int displayableRows, int n_choices, int n_attributes, int attributesSpacing, int maxX,
+                     int *numElement, int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+{
+    dataSet *newEntry = (dataSet*)calloc(1,sizeof(dataSet));
+    dataSet *curr = head;
+    char temp[10];
+    // taking input for 7 attributes
+    for (int i = 1; i<= n_attributes -1; i++){
+        wmove(bottomMenu, 0, 0);
+        wclrtoeol(bottomMenu);
+        mvwprintw(bottomMenu, 0, 0, "Add %s:", attributes[i]);
+        bool validated = false;
+        nocbreak();
+        echo();
+        curs_set(1);
+        switch (i)
+        {
+        case 1:
+            inputandValidateStr(bottomMenu, newEntry->flightNumber, ".{2,3}\\s[0-9]*", 20, maxX, false);
+            break;
+        case 2:
+            inputandValidateStr(bottomMenu, newEntry->origin, "[A-Z]+", 20, maxX, false);
+            break;
+        case 3:
+            inputandValidateStr(bottomMenu, newEntry->destination, "[A-Z]+", 20, maxX, false);
+            break;
+        case 4:
+            inputandValidateStr(bottomMenu, temp,"[0-9]+", 20, maxX, false);
+            newEntry->capacity = atoi(temp);
+            break;
+        case 5:
+            inputValidateTime(bottomMenu, temp,"[0-9]{4}", 20, maxX, &(newEntry->departureHour), &(newEntry->departureMinutes));
+            break;
+        case 6:
+            inputandValidateStr(bottomMenu, temp,"(0|[1-9][0-9]*)(\\.[0-9]+)?", 20, maxX, false);
+            newEntry->price = atof(temp);
+            break;
+        case 7:
+            inputandValidateStr(bottomMenu, temp, "[0-9]{1}", 20, maxX, false);
+            newEntry->stops = atoi(temp);
+            break;
+        default:
+            break;
+        }
+        cbreak();
+        noecho();
+        curs_set(0);
+    }
+    cbreak();
+    noecho();
+    curs_set(0);
+
+    // Cyele to last node from head
+    while(curr->nextNode != NULL){
+        curr = curr->nextNode;
+    }
+    curr->nextNode = newEntry;
+    newEntry->prevNode = curr;
+    newEntry->nextNode = NULL;
+
+    mvwprintw(bottomMenu, 0, 0, "New entry has been added! Press any key to continue");
+    wgetch(bottomMenu);
+    (*numElement)++;
+}
+
+void cursesInsert(dataSet *head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+                     int displayableRows, int n_choices, int n_attributes, int attributesSpacing, int maxX,
+                     int *numElement, int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+{
+    dataSet *newEntry = (dataSet*)calloc(1,sizeof(dataSet));
+    dataSet *curr = head;
+    char temp[10];
+    //taking input for 7 attributes
+    for (int i = 1; i<= n_attributes -1; i++){
+        wmove(bottomMenu, 0, 0);
+        wclrtoeol(bottomMenu);
+        mvwprintw(bottomMenu, 0, 0, "Add %s:", attributes[i]);
+        bool validated = false;
+        nocbreak();
+        echo();
+        curs_set(1);
+        switch (i)
+        {
+        case 1:
+            inputandValidateStr(bottomMenu, newEntry->flightNumber, ".{2,3}\\s[0-9]*", 20, maxX, false);
+            break;
+        case 2:
+            inputandValidateStr(bottomMenu, newEntry->origin, "[A-Z]+", 20, maxX, false);
+            break;
+        case 3:
+            inputandValidateStr(bottomMenu, newEntry->destination, "[A-Z]+", 20, maxX, false);
+            break;
+        case 4:
+            inputandValidateStr(bottomMenu, temp,"[0-9]+", 20, maxX, false);
+            newEntry->capacity = atoi(temp);
+            break;
+        case 5:
+            inputValidateTime(bottomMenu, temp,"[0-9]{4}", 20, maxX, &(newEntry->departureHour), &(newEntry->departureMinutes));
+            break;
+        case 6:
+            inputandValidateStr(bottomMenu, temp,"(0|[1-9][0-9]*)(\\.[0-9]+)?", 20, maxX, false);
+            newEntry->price = atof(temp);
+            break;
+        case 7:
+            inputandValidateStr(bottomMenu, temp, "[0-9]{1}", 20, maxX, false);
+            newEntry->stops = atoi(temp);
+            break;
+        default:
+            break;
+        }
+        cbreak();
+        noecho();
+        curs_set(0);
+    }
+    cbreak();
+    noecho();
+    curs_set(0);
+    // strcpy(newEntry->flightNumber, "AAA 111");
+    // strcpy(newEntry->origin, "AAA");
+    // strcpy(newEntry->destination, "BBB");
+    // newEntry->departureHour = 12;
+    // newEntry->departureMinutes = 12;
+    // newEntry->capacity = 100;
+    // newEntry->price = 100.00;
+    // newEntry->stops = 1;  
+    
+    // Cyele to the current index
+    for (int k = 0; k < (*index + *highlitedRow); k++)
+    {
+        curr = curr->nextNode;
+    }
+    if(curr->nextNode == NULL){
+        curr->nextNode = newEntry;
+        newEntry->prevNode = curr;
+        newEntry->nextNode = NULL;
+    }else{
+        newEntry->nextNode = curr->nextNode;
+        curr->nextNode->prevNode = newEntry;
+        curr->nextNode = newEntry;
+        newEntry->prevNode = curr;
+    }
+
+    mvwprintw(bottomMenu, 0, 0, "New entry has been inserted in line %d! Press any key to continue", *index + *highlitedRow +2);
+    wgetch(bottomMenu);
+    (*numElement)++;
+}
+
+void cursesDelete(dataSet **head, WINDOW *main, WINDOW *bottomMenu, WINDOW *attributeRow,
+                     int displayableRows, int n_choices, int n_attributes, int attributesSpacing, int maxX,
+                     int *numElement, int *menuItem, int *index, int *highlitedRow, int *key, char **choices, char **attributes)
+{
+    dataSet *curr = *head;
+
+    // Cyele to the current index
+    for (int k = 0; k < (*index + *highlitedRow); k++)
+    {
+        curr = curr->nextNode;
+    }
+
+    // if the head is to be deleted
+    if (curr->prevNode == NULL){
+        *(head) = curr->nextNode;
+        (*head)->prevNode = NULL;
+        free(curr);
+    }else if(curr->nextNode == NULL){
+        // if the last element is to be deleted
+        curr->prevNode->nextNode = NULL;
+        free(curr);
+    }else{
+        // Normal deletion
+        curr->prevNode->nextNode = curr->nextNode;
+        curr->nextNode->prevNode = curr->prevNode;
+        free(curr);
+    }
 
 
+    mvwprintw(bottomMenu, 0, 0, "Entry has been deleted ! Press any key to continue");
+    wgetch(bottomMenu);
+    (*numElement)--;
+}
 
-int main (){
+int main ()
+{
 
     FILE *fp = fopen(FILENAME, "r+");
     if (!fp){
         perror("Error Opening File");
     }
 
+    FILE *fp2 = fopen(FILENAME2, "w");
+
     int lineCount = trueLinecount(fp);
     validateFile(fp);
+
     dataSet *db = loadFile(fp, lineCount);
     int numElement = lineCount - 1;
+
+    // sortByFlightNumber(&db);
+
+    // writetoCopy(db, fp2);
+
 
     initscr(); noecho(); cbreak(); start_color(); curs_set(0);
     init_pair(1, COLOR_WHITE, COLOR_BLACK);
@@ -712,7 +1143,8 @@ int main (){
     char *choices[] = { 
             "Search", 
             "Sort", 
-            "insert", 
+            "Add", 
+            "Insert", 
             "Delete", 
             "Update",
             "Save",
@@ -742,7 +1174,7 @@ int main (){
         {
             menuItem = index = highlitedRow = key = 0;
             cursesPrintSearch(db, main, bottomMenu, attributeRow, 
-            displayableRows, numElement, n_choices, n_attributes, attributesSpacing,
+            displayableRows, numElement, n_choices, n_attributes, attributesSpacing, maxX,
             &menuItem, &index, &highlitedRow, &key, choices, attributes);
 
         }else if (menuItem == 1){
@@ -750,6 +1182,21 @@ int main (){
             cursesPrintSort(db, main, bottomMenu, attributeRow, 
             displayableRows, numElement, n_choices, n_attributes, attributesSpacing,
             &menuItem, &index, &highlitedRow, &key, choices, attributes);
+        }
+        else if (menuItem == 2){
+            menuItem = index = highlitedRow = key = 0;
+            cursesAdd(db, main, bottomMenu, attributeRow, 
+            displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
+            &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
+        }else if (menuItem == 3){
+            cursesInsert(db, main, bottomMenu, attributeRow, 
+            displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
+            &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
+        }
+        else if (menuItem == 4){
+            cursesDelete(&db, main, bottomMenu, attributeRow, 
+            displayableRows,n_choices, n_attributes, attributesSpacing, maxX,
+            &numElement, &menuItem, &index, &highlitedRow, &key, choices, attributes);
         }
     }
 
@@ -761,5 +1208,6 @@ int main (){
     // printCustomOrder(search1);
     // printf("%s",search1->element->flightNumber);
     fclose(fp);
+    fclose(fp2);
     endwin();
 }
