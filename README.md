@@ -12,7 +12,7 @@ External libraries used:
   ``` bash
   git clone https://github.com/seapanda0/ACE6123-Assignment
     
-  sudo apt-get install libncurses5-dev
+  sudo apt install libncurses5-dev
 
   cd ACE6123-Assignment/
 
