@@ -31,6 +31,10 @@ Use left/right arrow keys to navigate through the menu options, Up/down arrow ke
 
 ## Screenshots
 
-![GIF of program][logo]
+![Running][ss-1]
 
-[logo]: https://i.imgur.com/t7SzATU.gif "Logo Title Text 2"
+![GIF of program][ss-2]
+
+[ss-1]:https://i.imgur.com/ktOytH7.gif "GIF 1"
+
+[ss-2]: https://i.imgur.com/t7SzATU.gif "GIF 2"
