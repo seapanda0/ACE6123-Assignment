@@ -29,6 +29,17 @@ At start, the program will prompt you for the database text file. You need to en
 
 Use left/right arrow keys to navigate through the menu options, Up/down arrow keys or mouse scroll wheel to navigate through the data list.
 
+## Features
+ - File validation using regular expressions
+ - Search by flight number, origin and destination
+ - Sort by all attributes
+ - Add entry at the botton of the dataset
+ - Insert entry at a specific line
+ - Delete a specific entry
+ - Update a selected entry
+ - Input validation using regular expressions
+ - Save file
+
 ## Screenshots
 
 ![Running][ss-1]
