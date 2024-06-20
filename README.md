@@ -3,7 +3,7 @@
 External libraries used:
 
 - [ncurses](https://invisible-island.net/ncurses/man/ncurses.3x.html)
-- regex (Packaged with POSIX systems)
+- regex (Prepackaged into POSIX systems)
 
 ## Compiling
 
@@ -30,22 +30,43 @@ At start, the program will prompt you for the database text file. You need to en
 Use left/right arrow keys to navigate through the menu options, Up/down arrow keys or mouse scroll wheel to navigate through the data list.
 
 ## Features
- - File validation using regular expressions
- - Search by flight number, origin and destination
- - Sort by all attributes
- - Add entry at the botton of the dataset
- - Insert entry at a specific line
- - Delete a specific entry
- - Update a selected entry
- - Input validation using regular expressions
- - Save file
+
+- File validation using regular expressions
+- Search by flight number, origin and destination
+- Sort by all attributes
+- Add entry at the botton of the dataset
+- Insert entry at a specific line
+- Delete a specific entry
+- Update a selected entry
+- Input validation using regular expressions
+- Save file
 
 ## Screenshots
 
 ![Running][ss-1]
 
-![GIF of program][ss-2]
+![Searching][ss-3]
 
-[ss-1]:https://i.imgur.com/ktOytH7.gif "GIF 1"
+![GIF of program's sort function][ss-2]
 
-[ss-2]: https://i.imgur.com/t7SzATU.gif "GIF 2"
+![Add][ss-4]
+
+![Insert][ss-6]
+
+![Delete][ss-5]
+
+![Update][ss-7]
+
+[ss-1]:https://i.imgur.com/ktOytH7.gif "INTRO"
+
+[ss-2]: https://i.imgur.com/bjGXtOa.gif "SORT"
+
+[ss-3]:https://i.imgur.com/MPa7AG3.gif "SEARCH"
+
+[ss-4]:https://i.imgur.com/Bu7u58R.gif "ADD"
+
+[ss-5]:https://i.imgur.com/SahBp2H.gif "DELETE"
+
+[ss-6]:https://i.imgur.com/lFu0Ay0.gif "INSERT"
+
+[ss-7]:https://i.imgur.com/0G5uNmF.gif "UPDATE"
